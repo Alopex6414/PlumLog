@@ -55,6 +55,30 @@ CPlumLog::CPlumLog(bool IsUseLog)
 }
 
 //------------------------------------------------------------------
+// @Function:	 PlumLogGetUse()
+// @Purpose: CPlumLog获取日志启用状态
+// @Since: v1.00a
+// @Para: None
+// @Return: bool (true: 启用, false: 不启用)
+//------------------------------------------------------------------
+bool CPlumLog::PlumLogGetUse() const
+{
+	return m_bIsUseLog;
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogSetUse()
+// @Purpose: CPlumLog设置日志启用状态
+// @Since: v1.00a
+// @Para: bool IsUseLog (true: 启用, false: 不启用)
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogSetUse(bool IsUseLog)
+{
+	m_bIsUseLog = IsUseLog;
+}
+
+//------------------------------------------------------------------
 // @Function:	 PlumLogInit()
 // @Purpose: CPlumLog初始化
 // @Since: v1.00a
@@ -67,6 +91,10 @@ void CPlumLog::PlumLogInit()
 	char* pModuleNameArr = NULL;
 	char* pTemp = NULL;
 	int nSize = 0;
+
+	if (!m_bIsUseLog) return;	//不启用日志记录直接返回
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;	//进入临界区失败返回
 
 	//获取模块名称
 	memset(ModulePathArr, 0, sizeof(ModulePathArr));
@@ -148,7 +176,9 @@ void CPlumLog::PlumLogInit()
 
 	//程式开始
 	PlumLogWriteLine("[Process Start]");
+	PlumLogWriteLine("Log Format:<Current Time>[Thread ID]<File,Line>:...\n");
 
+	LeaveCriticalSection(&m_csThreadSafe);	//离开临界区
 }
 
 //------------------------------------------------------------------
@@ -168,6 +198,18 @@ void CPlumLog::PlumLogExit()
 }
 
 //------------------------------------------------------------------
+// @Function:	 PlumLogClose()
+// @Purpose: CPlumLog关闭文件系统
+// @Since: v1.00a
+// @Para: None
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogClose()
+{
+	fclose(m_fp);
+}
+
+//------------------------------------------------------------------
 // @Function:	 PlumLogWrite()
 // @Purpose: CPlumLog写入(ASCII)
 // @Since: v1.00a
@@ -178,9 +220,163 @@ void CPlumLog::PlumLogWrite(LPCSTR lpcstr)
 {
 	char WriteArr[MAX_PATH];
 
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
 	memset(WriteArr, 0, sizeof(WriteArr));
 	_snprintf_s(WriteArr, sizeof(WriteArr), lpcstr);
 	fputs(WriteArr, m_fp);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteElongate()
+// @Purpose: CPlumLog写入(变参数长度)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteElongate(LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteNormal()
+// @Purpose: CPlumLog写入(标准格式)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteNormal(LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char CMDArr[MAX_PATH];
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	SYSTEMTIME CurrentTime;
+	DWORD dwThreadID;
+
+	GetLocalTime(&CurrentTime);			//获取当前时间
+	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
+
+	memset(CMDArr, 0, sizeof(CMDArr));
+	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID);
+	fputs(CMDArr, m_fp);
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteExtend()
+// @Purpose: CPlumLog写入(扩展格式)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteExtend(LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char* pArr = NULL;
+	char FileArr[MAX_PATH];
+	char CMDArr[MAX_PATH];
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	SYSTEMTIME CurrentTime;
+	DWORD dwThreadID;
+
+	GetLocalTime(&CurrentTime);			//获取当前时间
+	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
+
+	memset(FileArr, 0, sizeof(FileArr));
+	_snprintf_s(FileArr, sizeof(FileArr), "%s", __FILE__);
+	pArr = strrchr(FileArr, '\\') + 1;
+
+	memset(CMDArr, 0, sizeof(CMDArr));
+	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, __LINE__);
+	fputs(CMDArr, m_fp);
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteExtend()
+// @Purpose: CPlumLog写入(扩展格式)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: LPCSTR file		//__FILE__
+// @Para: long				//__LINE__
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteExtend(LPCSTR file, LONG line, LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char* pArr = NULL;
+	char CMDArr[MAX_PATH];
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	SYSTEMTIME CurrentTime;
+	DWORD dwThreadID;
+
+	GetLocalTime(&CurrentTime);			//获取当前时间
+	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
+
+	pArr = strrchr((char*)file, '\\') + 1;
+
+	memset(CMDArr, 0, sizeof(CMDArr));
+	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, line);
+	fputs(CMDArr, m_fp);
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
 }
 
 //------------------------------------------------------------------
@@ -194,10 +390,168 @@ void CPlumLog::PlumLogWriteLine(LPCSTR lpcstr)
 {
 	char WriteArr[MAX_PATH];
 
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
 	memset(WriteArr, 0, sizeof(WriteArr));
 	_snprintf_s(WriteArr, sizeof(WriteArr), lpcstr);
 	fputs(WriteArr, m_fp);
 	fputs("\n", m_fp);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteLineElongate()
+// @Purpose: CPlumLog写入(变参数长度)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteLineElongate(LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	fputs("\n", m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteLineNormal()
+// @Purpose: CPlumLog写入(标准格式)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteLineNormal(LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char CMDArr[MAX_PATH];
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	SYSTEMTIME CurrentTime;
+	DWORD dwThreadID;
+
+	GetLocalTime(&CurrentTime);			//获取当前时间
+	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
+
+	memset(CMDArr, 0, sizeof(CMDArr));
+	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID);
+	fputs(CMDArr, m_fp);
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	fputs("\n", m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteLineExtend()
+// @Purpose: CPlumLog写入(扩展格式)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteLineExtend(LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char* pArr = NULL;
+	char FileArr[MAX_PATH];
+	char CMDArr[MAX_PATH];
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	SYSTEMTIME CurrentTime;
+	DWORD dwThreadID;
+
+	GetLocalTime(&CurrentTime);			//获取当前时间
+	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
+
+	memset(FileArr, 0, sizeof(FileArr));
+	_snprintf_s(FileArr, sizeof(FileArr), "%s", __FILE__);
+	pArr = strrchr(FileArr, '\\') + 1;
+
+	memset(CMDArr, 0, sizeof(CMDArr));
+	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, __LINE__);
+	fputs(CMDArr, m_fp);
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	fputs("\n", m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
+}
+
+//------------------------------------------------------------------
+// @Function:	 PlumLogWriteLineExtend()
+// @Purpose: CPlumLog写入(扩展格式)
+// @Since: v1.00a
+// @Para: LPCSTR lpcstr		//数组地址
+// @Para: LPCSTR file		//__FILE__
+// @Para: long				//__LINE__
+// @Para: ...
+// @Return: None
+//------------------------------------------------------------------
+void CPlumLog::PlumLogWriteLineExtend(LPCSTR file, LONG line, LPCSTR lpcstr, ...)
+{
+	va_list arg_ptr;
+	char* pArr = NULL;
+	char CMDArr[MAX_PATH];
+	char WriteArr[MAX_PATH];
+
+	if (!m_bIsUseLog) return;
+
+	if (!TryEnterCriticalSection(&m_csThreadSafe)) return;
+
+	SYSTEMTIME CurrentTime;
+	DWORD dwThreadID;
+
+	GetLocalTime(&CurrentTime);			//获取当前时间
+	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
+
+	pArr = strrchr((char*)file, '\\') + 1;
+
+	memset(CMDArr, 0, sizeof(CMDArr));
+	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, line);
+	fputs(CMDArr, m_fp);
+
+	va_start(arg_ptr, lpcstr);
+	memset(WriteArr, 0, sizeof(WriteArr));
+	_vsnprintf(WriteArr, sizeof(WriteArr), lpcstr, arg_ptr);
+	fputs(WriteArr, m_fp);
+	fputs("\n", m_fp);
+	va_end(arg_ptr);
+
+	LeaveCriticalSection(&m_csThreadSafe);
 }
 
 //------------------------------------------------------------------
@@ -425,6 +779,6 @@ void CPlumLog::WriteLineCurrentTime()
 
 	GetLocalTime(&LocalTime);
 	memset(WriteArr, 0, sizeof(WriteArr));
-	_snprintf_s(WriteArr, sizeof(WriteArr), "Current Time: %d_%02d_%02d %02d:%02d:%02d\n", LocalTime.wYear, LocalTime.wMonth, LocalTime.wDay, LocalTime.wHour, LocalTime.wMinute, LocalTime.wSecond);
+	_snprintf_s(WriteArr, sizeof(WriteArr), "Current Time: %d-%02d-%02d %02d:%02d:%02d\n", LocalTime.wYear, LocalTime.wMonth, LocalTime.wDay, LocalTime.wHour, LocalTime.wMinute, LocalTime.wSecond);
 	fputs(WriteArr, m_fp);
 }
