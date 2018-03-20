@@ -6,8 +6,9 @@
 * @file		PlumLog.h
 * @brief	This Program is PlumLog DLL Project.
 * @author	Alopex/Helium
-* @version	v1.00a
+* @version	v1.01a
 * @date		2018-1-26	v1.00a	alopex	Create Project.
+* @date		2018-3-20	v1.01a	alopex	Modify Code Bug.
 */
 #pragma once
 

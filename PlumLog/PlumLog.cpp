@@ -6,8 +6,9 @@
 * @file		PlumLog.cpp
 * @brief	This Program is PlumLog DLL Project.
 * @author	Alopex/Helium
-* @version	v1.00a
+* @version	v1.01a
 * @date		2018-1-26	v1.00a	alopex	Create Project.
+* @date		2018-3-20	v1.01a	alopex	Modify Code Bug.
 */
 #include "PlumLog.h"
 
@@ -322,7 +323,15 @@ void CPlumLog::PlumLogWriteExtend(LPCSTR lpcstr, ...)
 
 	memset(FileArr, 0, sizeof(FileArr));
 	_snprintf_s(FileArr, sizeof(FileArr), "%s", __FILE__);
-	pArr = strrchr(FileArr, '\\') + 1;
+
+	if (strrchr(FileArr, '\\') != NULL)
+	{
+		pArr = strrchr(FileArr, '\\') + 1;
+	}
+	else
+	{
+		pArr = FileArr;
+	}
 
 	memset(CMDArr, 0, sizeof(CMDArr));
 	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, __LINE__);
@@ -364,7 +373,14 @@ void CPlumLog::PlumLogWriteExtend(LPCSTR file, LONG line, LPCSTR lpcstr, ...)
 	GetLocalTime(&CurrentTime);			//获取当前时间
 	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
 
-	pArr = strrchr((char*)file, '\\') + 1;
+	if (strrchr((char*)file, '\\') != NULL)
+	{
+		pArr = strrchr((char*)file, '\\') + 1;
+	}
+	else
+	{
+		pArr = (char*)file;
+	}
 
 	memset(CMDArr, 0, sizeof(CMDArr));
 	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, line);
@@ -495,7 +511,14 @@ void CPlumLog::PlumLogWriteLineExtend(LPCSTR lpcstr, ...)
 
 	memset(FileArr, 0, sizeof(FileArr));
 	_snprintf_s(FileArr, sizeof(FileArr), "%s", __FILE__);
-	pArr = strrchr(FileArr, '\\') + 1;
+	if (strrchr(FileArr, '\\') != NULL)
+	{
+		pArr = strrchr(FileArr, '\\') + 1;
+	}
+	else
+	{
+		pArr = FileArr;
+	}
 
 	memset(CMDArr, 0, sizeof(CMDArr));
 	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, __LINE__);
@@ -538,7 +561,14 @@ void CPlumLog::PlumLogWriteLineExtend(LPCSTR file, LONG line, LPCSTR lpcstr, ...
 	GetLocalTime(&CurrentTime);			//获取当前时间
 	dwThreadID = GetCurrentThreadId();	//获取当前线程ID
 
-	pArr = strrchr((char*)file, '\\') + 1;
+	if (strrchr((char*)file, '\\') != NULL)
+	{
+		pArr = strrchr((char*)file, '\\') + 1;
+	}
+	else
+	{
+		pArr = (char*)file;
+	}
 
 	memset(CMDArr, 0, sizeof(CMDArr));
 	_snprintf_s(CMDArr, sizeof(CMDArr), "<%d-%02d-%02d %02d:%02d:%02d.%03d>[%d]<%s Line:%d>:", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond, CurrentTime.wMilliseconds, dwThreadID, pArr, line);
