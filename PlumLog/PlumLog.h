@@ -9,6 +9,7 @@
 * @version	v1.01a
 * @date		2018-1-26	v1.00a	alopex	Create Project.
 * @date		2018-3-20	v1.01a	alopex	Modify Code Bug.
+* @date		2018-3-24	v1.02a	alopex	Add Auto Create File Path.
 */
 #pragma once
 
@@ -17,6 +18,7 @@
 
 //Include Windows Header File
 #include <Windows.h>
+#include <Shlwapi.h>
 
 //Include C/C++ Run Header File
 #include <stdio.h>

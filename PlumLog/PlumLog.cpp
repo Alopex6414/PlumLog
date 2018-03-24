@@ -9,6 +9,7 @@
 * @version	v1.01a
 * @date		2018-1-26	v1.00a	alopex	Create Project.
 * @date		2018-3-20	v1.01a	alopex	Modify Code Bug.
+* @date		2018-3-24	v1.02a	alopex	Add Auto Create File Path.
 */
 #include "PlumLog.h"
 
@@ -132,6 +133,12 @@ void CPlumLog::PlumLogInit()
 	memset(LogPathArr, 0, sizeof(LogPathArr));
 	_snprintf_s(LogDirArr, sizeof(LogDirArr), "%s\\log", ModulePathArr);
 	_snprintf_s(LogPathArr, sizeof(LogPathArr), "%s\\log\\%s_RuntimeLog_%d_%02d_%02d_%02d%02d%02d.log", ModulePathArr, pModuleNameArr, LocalTime.wYear, LocalTime.wMonth, LocalTime.wDay, LocalTime.wHour, LocalTime.wMinute, LocalTime.wSecond);
+
+	//检测文件夹路径是否存在
+	if (!PathFileExistsA(LogDirArr))
+	{
+		CreateDirectoryA(LogDirArr, NULL);
+	}
 
 	//创建或打开日志文件
 	char WriteArr[MAX_PATH];
